@@ -1,0 +1,94 @@
+{
+  "encodingVersion": {
+    "majorVersion": 2,
+    "minorVersion": 0
+  },
+  "flowEncodingVersion": "1.0",
+  "parameterContexts": {},
+  "snapshotGroup": {
+    "identifier": "root",
+    "name": "Crypto Pipeline",
+    "comments": "Automated pipeline for extracting and flattening live crypto prices.",
+    "position": { "x": 0.0, "y": 0.0 },
+    "processors": [
+      {
+        "identifier": "processor-invoke-http",
+        "name": "Fetch Crypto Prices",
+        "type": "org.apache.nifi.processors.standard.InvokeHTTP",
+        "position": { "x": 100.0, "y": 100.0 },
+        "properties": {
+          "HTTP Method": "GET",
+          "Remote URL": "https://coingecko.com",
+          "Connection Timeout": "5 secs",
+          "Read Timeout": "15 secs"
+        },
+        "style": {},
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "60 sec",
+        "executionNode": "ALL"
+      },
+      {
+        "identifier": "processor-evaluate-json",
+        "name": "Extract Financial Metrics",
+        "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+        "position": { "x": 100.0, "y": 350.0 },
+        "properties": {
+          "Destination": "flowfile-attribute",
+          "Return Type": "auto-detect",
+          "btc_usd_price": "$.bitcoin.usd",
+          "btc_24h_change": "$.bitcoin.usd_24h_change",
+          "eth_usd_price": "$.ethereum.usd",
+          "eth_24h_change": "$.ethereum.usd_24h_change"
+        },
+        "style": {}
+      },
+      {
+        "identifier": "processor-attr-to-json",
+        "name": "Flatten Payload to JSON",
+        "type": "org.apache.nifi.processors.standard.AttributesToJSON",
+        "position": { "x": 100.0, "y": 600.0 },
+        "properties": {
+          "Attributes List": "btc_usd_price, btc_24h_change, eth_usd_price, eth_24h_change",
+          "Destination": "flowfile-content",
+          "Include Core Attributes": "false",
+          "Null Value Behavior": "Skip Property"
+        },
+        "style": {}
+      },
+      {
+        "identifier": "processor-log-data",
+        "name": "Log Clean JSON Payload",
+        "type": "org.apache.nifi.processors.standard.LogAttribute",
+        "position": { "x": 100.0, "y": 850.0 },
+        "properties": {
+          "Log Level": "info",
+          "Log Payload": "true"
+        },
+        "style": {}
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-1",
+        "source": { "id": "processor-invoke-http", "type": "PROCESSOR" },
+        "destination": { "id": "processor-evaluate-json", "type": "PROCESSOR" },
+        "selectedRelationships": ["Response"],
+        "backPressureObjectThreshold": 10000
+      },
+      {
+        "identifier": "conn-2",
+        "source": { "id": "processor-evaluate-json", "type": "PROCESSOR" },
+        "destination": { "id": "processor-attr-to-json", "type": "PROCESSOR" },
+        "selectedRelationships": ["matched"],
+        "backPressureObjectThreshold": 10000
+      },
+      {
+        "identifier": "conn-3",
+        "source": { "id": "processor-attr-to-json", "type": "PROCESSOR" },
+        "destination": { "id": "processor-log-data", "type": "PROCESSOR" },
+        "selectedRelationships": ["success"],
+        "backPressureObjectThreshold": 10000
+      }
+    ]
+  }
+}
